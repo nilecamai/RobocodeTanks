@@ -1,6 +1,8 @@
 package RadarSpinner;
 import robocode.*;
+import robocode.Robot;
 
+import java.awt.*;
 import java.awt.geom.Point2D;
 import java.util.ArrayList;
 /*
@@ -25,11 +27,13 @@ public class RadarSpinner extends Robot {
 
         while (true) {
             //turnRadarRight(Double.POSITIVE_INFINITY); // just yeetin spin it
-            turnRadarRight(360);
+            System.out.println("Heading: " + getHeading() + "\n(" + x + ", " + y + ")");
+            //turnRadarRight(360);
             for (RoboGravPoint gravPoint: gravPoints) {
-                System.out.println(gravPoint);
+                //System.out.println(gravPoint);
             }
-            antiGravMove();
+            //antiGravMove();
+            goTo(0,0);
         }
     }
 
@@ -48,7 +52,7 @@ public class RadarSpinner extends Robot {
         double enemyAngle = Math.toRadians(getHeading() + event.getBearing());
         double x = Math.sin(enemyAngle) * distance;
         double y = Math.cos(enemyAngle) * distance;
-        double power = 1; // magic number for power
+        double power = event.getEnergy() * 10000000;
         gravPoints.add(new RoboGravPoint(name, x, y, power, distance));
     }
 
@@ -62,13 +66,16 @@ public class RadarSpinner extends Robot {
         for (RoboGravPoint gravPoint: gravPoints) {
             p = gravPoint;
             magn = p.power / Math.pow(p.distance, 2);
-            System.out.println(magn);
+            System.out.println("Magnitude of " + p.name + ": " + magn);
             dir = normaliseBearing(Math.PI/2 - Math.atan2(getY() - p.y, getX() - p.x));
-            System.out.println(dir);
+            dir = Math.atan2(getY() - p.y, getX() - p.x);
             xComp += Math.sin(dir) * magn;
             yComp += Math.cos(dir) * magn;
-            goTo(xComp, yComp);
         }
+        xComp += getX();
+        yComp += getY();
+        System.out.println("Going to: " + xComp + " , " + yComp);
+        goTo(xComp, yComp);
     }
 
     public double normaliseBearing(double angle) {
@@ -78,9 +85,19 @@ public class RadarSpinner extends Robot {
     }
 
     public void goTo(double x, double y) {
-        double angle = Math.toDegrees(Math.atan2(y - getY(), x - getX())) - getHeading();
+        double angle = Math.toDegrees(Math.atan2(y - getY(), x - getX()));
+        if (x > getX() && y < getY()) {
+            angle += 90;
+        } else if (x < getX() && y < getY()) {
+            angle += 180;
+        } else if (x < getX() && y > getY()) {
+            angle += 270;
+        }
+        angle -= getHeading();
         turnRight(angle);
-        ahead(Math.sqrt(Math.pow(y - getY(), 2) + Math.pow(x - getX(), 2)));
+        double dist = Math.sqrt(Math.pow(y - getY(), 2) + Math.pow(x - getX(), 2));
+        System.out.println("Turning " + angle + " and going " + dist);
+        ahead(dist);
     }
 
     public void getEventCoordinates(ScannedRobotEvent e) { // the goal: take heading data, own coordinates, and distance to approximate coordinates of scanned event
