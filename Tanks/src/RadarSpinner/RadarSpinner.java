@@ -1,9 +1,6 @@
 package RadarSpinner;
 import robocode.*;
 import robocode.Robot;
-
-import java.awt.*;
-import java.awt.geom.Point2D;
 import java.util.ArrayList;
 /*
  * you want to have the radar spinning independent of the gun so you can actively be scanning while moving/shooting
@@ -27,13 +24,11 @@ public class RadarSpinner extends Robot {
 
         while (true) {
             //turnRadarRight(Double.POSITIVE_INFINITY); // just yeetin spin it
-            System.out.println("Heading: " + getHeading() + "\n(" + x + ", " + y + ")");
-            //turnRadarRight(360);
+            turnRadarRight(360);
             for (RoboGravPoint gravPoint: gravPoints) {
-                //System.out.println(gravPoint);
+                System.out.println(gravPoint);
             }
-            //antiGravMove();
-            goTo(0,0);
+            antiGravMove();
         }
     }
 
@@ -64,43 +59,43 @@ public class RadarSpinner extends Robot {
         RoboGravPoint p;
 
         for (RoboGravPoint gravPoint: gravPoints) {
+            double dx, dy;
             p = gravPoint;
-            magn = p.power / Math.pow(p.distance, 2);
-            System.out.println("Magnitude of " + p.name + ": " + magn);
+            dx = p.x - getX();
+            dy = p.y - getY();
+            System.out.println("Avoiding " + p.name + " located at (" + p.x + ", " + p.y + ")");
+            magn = p.power / Math.pow(p.distance, 2); // always positive
+            magn = 1;
+            //System.out.println("Magnitude of " + p.name + ": " + magn);
             dir = normaliseBearing(Math.PI/2 - Math.atan2(getY() - p.y, getX() - p.x));
-            dir = Math.atan2(getY() - p.y, getX() - p.x);
+            dir = Math.atan2(dy, dx);
             xComp += Math.sin(dir) * magn;
             yComp += Math.cos(dir) * magn;
         }
+
+        System.out.println("Moving " + xComp + " horizontally and " + yComp + " vertically.");
         xComp += getX();
         yComp += getY();
         System.out.println("Going to: " + xComp + " , " + yComp);
         goTo(xComp, yComp);
     }
 
-    public double normaliseBearing(double angle) {
+    public double normaliseBearing(double angle) { // doesn't quite work as intended don't use this
         while (angle > 180) angle -= 360;
         while (angle < -180) angle += 360;
         return angle;
     }
 
     public void goTo(double x, double y) {
-        double angle = Math.toDegrees(Math.atan2(y - getY(), x - getX()));
-        if (x > getX() && y < getY()) {
-            angle += 90;
-        } else if (x < getX() && y < getY()) {
-            angle += 180;
-        } else if (x < getX() && y > getY()) {
-            angle += 270;
-        }
+        // System.out.println("I am at (" + getX() + ", " + getY() + ") and am going to (" + x + ", " + y + ")");
+        double dx, dy;
+        dx = x - getX();
+        dy = y - getY();
+        double angle = Math.toDegrees(Math.atan2(dx, dy));
         angle -= getHeading();
         turnRight(angle);
-        double dist = Math.sqrt(Math.pow(y - getY(), 2) + Math.pow(x - getX(), 2));
-        System.out.println("Turning " + angle + " and going " + dist);
+        double dist = Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2));
         ahead(dist);
-    }
-
-    public void getEventCoordinates(ScannedRobotEvent e) { // the goal: take heading data, own coordinates, and distance to approximate coordinates of scanned event
-        Point2D.Double p = new Point2D.Double();
+        // System.out.println("Turning " + angle + " and going " + dist);
     }
 }
