@@ -1,7 +1,8 @@
 package RadarSpinner;
 import robocode.*;
-import robocode.Robot;
+
 import java.util.ArrayList;
+import robocode.util.*;
 /*
  * you want to have the radar spinning independent of the gun so you can actively be scanning while moving/shooting
  * there are three spinning thingies:
@@ -10,45 +11,97 @@ import java.util.ArrayList;
  *      the radar
  */
 
-public class RadarSpinner extends Robot {
+public class RadarSpinner extends AdvancedRobot {
 
+    public static final double SAFE_DISTANCE = 400;
+    public static final double WALL_AVOIDANCE_CONSTANT = 250000;
+    public static final double CHANCE_OF_RANDOM_MOVE = 0;
+    public static final double BOT_AVOIDANCE_CONSTANT = 500;
+    public static final double FIREPOWER = 1;
     public ArrayList<RoboGravPoint> gravPoints = new ArrayList<RoboGravPoint>();
 
     public void run() {
 
-        setAdjustRadarForGunTurn(false); // sets radar independent of gun
-        setAdjustGunForRobotTurn(false); // sets radar independent of robot
+        setAdjustRadarForGunTurn(true); // sets radar independent of gun
+        setAdjustRadarForRobotTurn(true); // sets radar independent of robot
+        setAdjustGunForRobotTurn(true); // sets gun independent of robot
 
-        double x = getX();
-        double y = getY();
+        setTurnRadarRight(Double.POSITIVE_INFINITY); // just yeetin spin it
 
-        while (true) {
-            //turnRadarRight(Double.POSITIVE_INFINITY); // just yeetin spin it
-            turnRadarRight(360);
-            for (RoboGravPoint gravPoint: gravPoints) {
-                System.out.println(gravPoint);
+        while (true) {            
+            /*
+            if (!randomMove(false)) {
+                //fastAntiGravMove();
+                antiGravMove();
+                System.out.println("Executing antigrav move");
             }
+            */
             antiGravMove();
+            execute();
+            shootAtClosest();
+            execute();
+            //avoidWalls();
+            //execute();
         }
+        
     }
 
     @Override
     public void onScannedRobot(ScannedRobotEvent event) {
-        String name = event.getName();
-        for (RoboGravPoint gravPoint: gravPoints) { // make sure we don't have a duplicate gravPoint/can update a gravPoint
-            if (name.equals(gravPoint.name)) {
-                System.out.println("Duplicate bot '" + name + "' scanned!");
-                return;
+        updateGravPoint(event);
+    }
+
+    @Override
+    public void onRobotDeath(RobotDeathEvent event) {
+        for (int i = 0; i < gravPoints.size(); i++) {
+            if (event.getName().equals(gravPoints.get(i).name)) {
+                gravPoints.remove(i);
             }
         }
-        System.out.println("New bot '" + name + "' scanned!");
-        // trig
+    }
+
+    public void updateGravPoint(ScannedRobotEvent event) {
+        String name = event.getName();
+        // math
         double distance = event.getDistance();
-        double enemyAngle = Math.toRadians(getHeading() + event.getBearing());
-        double x = Math.sin(enemyAngle) * distance;
-        double y = Math.cos(enemyAngle) * distance;
-        double power = event.getEnergy() * 10000000;
-        gravPoints.add(new RoboGravPoint(name, x, y, power, distance));
+        double enemyAngle = getHeadingRadians() + event.getBearingRadians();
+        double x = Math.sin(enemyAngle) * distance + getX();
+        double y = Math.cos(enemyAngle) * distance + getY();
+        double power = event.getEnergy() * 50;
+        double velocity = event.getVelocity();
+        double heading = event.getHeadingRadians();
+
+        boolean foundDuplicate = false;
+        for (int i = 0; i < gravPoints.size(); i++) { // make sure we don't have a duplicate gravPoint/can update a gravPoint
+            if (name.equals(gravPoints.get(i).name)) {
+                gravPoints.set(i, new RoboGravPoint(name, x, y, power, distance, velocity, heading));
+                System.out.println("Updated " + name);
+                foundDuplicate = true;
+                break;
+            }
+        }
+        if (!foundDuplicate) {
+            gravPoints.add(new RoboGravPoint(name, x, y, power, distance, velocity, heading));
+            System.out.println("Added robot " + name);
+        }
+    }
+
+    public void fastAntiGravMove() {
+        double xForce = 0, yForce = 0;
+        for (RoboGravPoint p: gravPoints) {
+            double absBearing = Utils.normalAbsoluteAngle(Math.atan2(getX() - p.x,getY() - p.y));
+            xForce += Math.sin(absBearing) / Math.pow(p.distance, 2);
+            yForce += Math.cos(absBearing) / Math.pow(p.distance, 2);
+        }
+        // wall repulsion
+        
+        xForce += (WALL_AVOIDANCE_CONSTANT / getBattleFieldWidth()) / Math.pow(getX(), 2);
+        yForce += (WALL_AVOIDANCE_CONSTANT / getBattleFieldWidth()) / Math.pow(getY(), 2);
+        xForce -= (WALL_AVOIDANCE_CONSTANT / getBattleFieldHeight()) / Math.pow(getBattleFieldWidth() - getX(), 2);
+        yForce -= (WALL_AVOIDANCE_CONSTANT / getBattleFieldHeight()) / Math.pow(getBattleFieldHeight() - getY(), 2);
+        
+        double angle = Math.atan2(xForce, yForce);
+        goToVector(Double.POSITIVE_INFINITY, angle);
     }
 
     public void antiGravMove() {
@@ -61,29 +114,117 @@ public class RadarSpinner extends Robot {
         for (RoboGravPoint gravPoint: gravPoints) {
             double dx, dy;
             p = gravPoint;
-            dx = p.x - getX();
-            dy = p.y - getY();
-            System.out.println("Avoiding " + p.name + " located at (" + p.x + ", " + p.y + ")");
-            magn = p.power / Math.pow(p.distance, 2); // always positive
-            magn = 1;
-            //System.out.println("Magnitude of " + p.name + ": " + magn);
-            dir = normaliseBearing(Math.PI/2 - Math.atan2(getY() - p.y, getX() - p.x));
-            dir = Math.atan2(dy, dx);
+            dx = getX() - p.x;
+            dy = getY() - p.y;
+            magn = p.power * BOT_AVOIDANCE_CONSTANT / Math.pow(p.distance, 2); // always positive
+            dir = Math.atan2(dx, dy);
             xComp += Math.sin(dir) * magn;
             yComp += Math.cos(dir) * magn;
         }
 
-        System.out.println("Moving " + xComp + " horizontally and " + yComp + " vertically.");
-        xComp += getX();
-        yComp += getY();
-        System.out.println("Going to: " + xComp + " , " + yComp);
+        /*
+        double unitVectorX, unitVectorY;
+        unitVectorX = xComp / Math.hypot(xComp, yComp);
+        unitVectorY = yComp / Math.hypot(xComp, yComp);
+        if (getX() + xComp * unitVectorX > getBattleFieldWidth() || getX() - xComp * unitVectorX < getBattleFieldWidth() ||
+            getY() + yComp * unitVectorY > getBattleFieldHeight() || getY() - yComp * unitVectorY < getBattleFieldHeight()) {
+                wallSmoothMove(WALL_AVOIDANCE_CONSTANT]);
+        }
+        */
+
+        double xWallForce, yWallForce;
+        xWallForce = WALL_AVOIDANCE_CONSTANT / Math.pow(getX(), 2) - WALL_AVOIDANCE_CONSTANT / Math.pow(getBattleFieldWidth() - getX(), 2);
+        yWallForce = yComp += WALL_AVOIDANCE_CONSTANT / Math.pow(getY(), 2) - WALL_AVOIDANCE_CONSTANT / Math.pow(getBattleFieldHeight() - getY(), 2);
+        /*
+        xComp += WALL_AVOIDANCE_CONSTANT / Math.pow(getX(), 2);
+        yComp += WALL_AVOIDANCE_CONSTANT / Math.pow(getY(), 2);
+        xComp -= WALL_AVOIDANCE_CONSTANT / Math.pow(getBattleFieldWidth() - getX(), 2);
+        yComp -= WALL_AVOIDANCE_CONSTANT / Math.pow(getBattleFieldHeight() - getY(), 2);
+        */
+        System.out.println("Walls are exerting forces:" + xWallForce + " and " + yWallForce);
+
+        xComp += getX() + xWallForce;
+        yComp += getY() + yWallForce;
+        System.out.println("Going to (" + xComp + ", " + yComp);
         goTo(xComp, yComp);
     }
 
-    public double normaliseBearing(double angle) { // doesn't quite work as intended don't use this
-        while (angle > 180) angle -= 360;
-        while (angle < -180) angle += 360;
-        return angle;
+    public boolean randomMove(boolean definite) {
+        if (findClosestGravPoint() != null) {
+            if ((definite && findClosestGravPoint().distance > SAFE_DISTANCE) || Math.random() <= CHANCE_OF_RANDOM_MOVE) {
+                double xComp, yComp;
+                if (getX() >= getBattleFieldWidth() / 2) {
+                    xComp = Math.random() * getBattleFieldWidth() / 2 - WALL_AVOIDANCE_CONSTANT;
+                } else {
+                    xComp = -Math.random() * getBattleFieldWidth() / 2 - WALL_AVOIDANCE_CONSTANT;
+                }
+                if (getY() >= getBattleFieldHeight() / 2) {
+                    yComp = Math.random() * getBattleFieldHeight() / 2 - WALL_AVOIDANCE_CONSTANT;
+                } else {
+                    yComp = -Math.random() * getBattleFieldHeight() / 2 - WALL_AVOIDANCE_CONSTANT;
+                }
+                xComp += getX();
+                yComp += getY();
+                goTo(xComp, yComp);
+                System.out.println("Executing random move");
+                return true;                    
+            }            
+        }
+        return false;
+    }
+
+    public void huntBot() {
+        if (gravPoints.size() > 0) { // hunts the first one
+            goTo(gravPoints.get(0).x, gravPoints.get(0).y);
+        }
+    }
+
+    public void shootAtClosest() {
+        if (findClosestGravPoint() != null) {
+            RoboGravPoint p = findClosestGravPoint();
+            if (p.distance < SAFE_DISTANCE) {
+                double xVel = p.velocity * Math.sin(p.heading), yVel = p.velocity * Math.cos(p.heading), gunTurnAngle = 0;
+                gunTurnAngle = Utils.normalRelativeAngle(Math.atan2(p.x - getX(), p.y - getY()) - getGunHeadingRadians());
+                System.out.println("Turning gun " + Math.toDegrees(gunTurnAngle) + " to shoot at " + p.name + " at (" + p.x + ", " + p.y + ")");
+                turnGunRightRadians(gunTurnAngle);
+                setFire(FIREPOWER);
+            }            
+        }
+    }
+
+    public void predictiveShoot(RoboGravPoint p, double firePower) {
+        if (p != null) {
+            final double eAbsBearing = Utils.normalAbsoluteAngle(Math.atan2(p.x - getX(), p.y - getY())),
+            bV = Rules.getBulletSpeed(firePower);
+
+        }
+    }
+
+    public RoboGravPoint findClosestGravPoint() {
+        double closestDistance = Double.POSITIVE_INFINITY;
+        RoboGravPoint closest = null;
+        for (RoboGravPoint p: gravPoints) {
+            if (p.distance < closestDistance) {
+                closest = p;
+                closestDistance = p.distance;
+            }
+        }
+        return closest;
+    }
+
+    public void avoidWalls() {
+        if (getX() < WALL_AVOIDANCE_CONSTANT || getBattleFieldWidth() - getX() > WALL_AVOIDANCE_CONSTANT ||
+        getY() < WALL_AVOIDANCE_CONSTANT || getBattleFieldHeight() - getY() > WALL_AVOIDANCE_CONSTANT); {
+            //turnRightRadians(Math.PI / 2);
+            double radius = 2 * WALL_AVOIDANCE_CONSTANT / (2 + Math.sqrt(2)); // worst cast scenario where we're going 45 degrees into a corner
+            //setTurnRightRadians(getVelocity() / radius);
+            turnLeftRadians(Math.atan(Math.tan(getHeadingRadians())));
+            System.out.println("Avoiding a wall");
+        }
+    }
+
+    public void wallSmoothMove(double w) {
+        setTurnRightRadians(getVelocity() * Math.PI / (2 * w));
     }
 
     public void goTo(double x, double y) {
@@ -91,11 +232,25 @@ public class RadarSpinner extends Robot {
         double dx, dy;
         dx = x - getX();
         dy = y - getY();
-        double angle = Math.toDegrees(Math.atan2(dx, dy));
-        angle -= getHeading();
-        turnRight(angle);
-        double dist = Math.sqrt(Math.pow(dx, 2) + Math.pow(dy, 2));
-        ahead(dist);
-        // System.out.println("Turning " + angle + " and going " + dist);
+        double targetAngle = Utils.normalRelativeAngle(Math.atan2(dx, dy) - getHeadingRadians());
+        double dist = Math.hypot(dx, dy);
+        double turnAngle = Math.atan(Math.tan(targetAngle));
+        setTurnRightRadians(turnAngle);
+        if (turnAngle == targetAngle) {
+            setAhead(dist);
+        } else {
+            setBack(dist);
+        }
+    }
+
+    public void goToVector(double magn, double dir) { // takes radians
+        dir = Utils.normalRelativeAngle(dir - getHeadingRadians());
+        double turnAngle = Math.atan(Math.tan(dir));
+        setTurnRightRadians(turnAngle);
+        if (turnAngle == dir) {
+            setAhead(magn);
+        } else {
+            setBack(magn);
+        }
     }
 }
