@@ -1,4 +1,4 @@
-package RadarSpinner;
+package SpinnyBoi;
 import robocode.*;
 
 import java.util.ArrayList;
@@ -11,7 +11,7 @@ import robocode.util.*;
  *      the radar
  */
 
-public class RadarSpinner extends AdvancedRobot {
+public class SpinnyBoi extends AdvancedRobot {
 
     public static final double SAFE_DISTANCE = 400;
     public static final double FIRING_DISTANCE = 500;
@@ -29,16 +29,18 @@ public class RadarSpinner extends AdvancedRobot {
 
         setTurnRadarRight(Double.POSITIVE_INFINITY); // just yeetin spin it
 
-        while (true) {       
+        while (true) {            
+            /*
             if (!randomMove(false)) {
                 //fastAntiGravMove();
                 antiGravMove();
                 System.out.println("Executing antigrav move");
             }
-            //antiGravMove();
+            */
+            antiGravMove();
             execute();
-            shootAtClosest();
-            //predictiveShoot(getClosestGravPoint());
+            //shootAtClosest();
+            predictiveShoot(getClosestGravPoint());
             execute();
             //avoidWalls();
             //execute();
@@ -70,7 +72,7 @@ public class RadarSpinner extends AdvancedRobot {
         double power = event.getEnergy() * 50;
         double velocity = event.getVelocity();
         double heading = event.getHeadingRadians();
-
+        
         boolean foundDuplicate = false;
         for (int i = 0; i < gravPoints.size(); i++) { // make sure we don't have a duplicate gravPoint/can update a gravPoint
             if (name.equals(gravPoints.get(i).name)) {
@@ -83,6 +85,7 @@ public class RadarSpinner extends AdvancedRobot {
         if (!foundDuplicate) {
             gravPoints.add(new RoboGravPoint(name, x, y, power, distance, velocity, heading));
             System.out.println("Added robot " + name);
+            //gravPoints.add(new RoboGravPoint(event, this)); <- THIS HAS TO WORK TO MAKE EVERTHING EZZZ
         }
     }
 
