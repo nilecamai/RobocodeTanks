@@ -14,6 +14,7 @@ import robocode.util.*;
 public class RadarSpinner extends AdvancedRobot {
 
     public static final double SAFE_DISTANCE = 400;
+    public static final double FIRING_DISTANCE = 500;
     public static final double WALL_AVOIDANCE_CONSTANT = 250000;
     public static final double CHANCE_OF_RANDOM_MOVE = 0;
     public static final double BOT_AVOIDANCE_CONSTANT = 500;
@@ -38,7 +39,8 @@ public class RadarSpinner extends AdvancedRobot {
             */
             antiGravMove();
             execute();
-            shootAtClosest();
+            //shootAtClosest();
+            predictiveShoot(getClosestGravPoint());
             execute();
             //avoidWalls();
             //execute();
@@ -150,8 +152,8 @@ public class RadarSpinner extends AdvancedRobot {
     }
 
     public boolean randomMove(boolean definite) {
-        if (findClosestGravPoint() != null) {
-            if ((definite && findClosestGravPoint().distance > SAFE_DISTANCE) || Math.random() <= CHANCE_OF_RANDOM_MOVE) {
+        if (getClosestGravPoint() != null) {
+            if ((definite && getClosestGravPoint().distance > SAFE_DISTANCE) || Math.random() <= CHANCE_OF_RANDOM_MOVE) {
                 double xComp, yComp;
                 if (getX() >= getBattleFieldWidth() / 2) {
                     xComp = Math.random() * getBattleFieldWidth() / 2 - WALL_AVOIDANCE_CONSTANT;
@@ -180,8 +182,8 @@ public class RadarSpinner extends AdvancedRobot {
     }
 
     public void shootAtClosest() {
-        if (findClosestGravPoint() != null) {
-            RoboGravPoint p = findClosestGravPoint();
+        if (getClosestGravPoint() != null) {
+            RoboGravPoint p = getClosestGravPoint();
             if (p.distance < SAFE_DISTANCE) {
                 double xVel = p.velocity * Math.sin(p.heading), yVel = p.velocity * Math.cos(p.heading), gunTurnAngle = 0;
                 gunTurnAngle = Utils.normalRelativeAngle(Math.atan2(p.x - getX(), p.y - getY()) - getGunHeadingRadians());
@@ -192,15 +194,66 @@ public class RadarSpinner extends AdvancedRobot {
         }
     }
 
-    public void predictiveShoot(RoboGravPoint p, double firePower) {
-        if (p != null) {
-            final double eAbsBearing = Utils.normalAbsoluteAngle(Math.atan2(p.x - getX(), p.y - getY())),
-            bV = Rules.getBulletSpeed(firePower);
-
+    public void predictiveShoot(RoboGravPoint p) {
+        final double ROBOT_DIMENSION = 16;
+        if (p != null) {         
+            final double firePower = FIRING_DISTANCE / p.distance;
+            final double eX = p.x, eY = p.y, eV = p.velocity, eHd = p.heading;
+            final double eAbsBearing = Utils.normalAbsoluteAngle(Math.atan2(eX - getX(), eY - getY()));
+            final double rX = getX(), rY = getY(), bV = Rules.getBulletSpeed(firePower);
+            final double A = (eX - rX) / bV;
+            final double B = eV / bV * Math.sin(eHd);
+            final double C = (eY - rY) / bV;
+            final double D = eV / bV * Math.cos(eHd);
+            // a*(1/t)^2 + b*(1/t) + c = 0
+            final double a = A * A + C * C;
+            final double b = 2 * (A * B + C * D);
+            final double c = (B * B + D * D - 1);
+            final double disc = b * b - 4 * a * c;
+            if (disc >= 0) {
+                final double t1 = 2 * a / (-b - Math.sqrt(disc));
+                final double t2 = 2 * a / (-b + Math.sqrt(disc));
+                final double t = Math.min(t1, t2) >= 0 ? Math.min(t1, t2) : Math.max(t1, t2);
+                final double eX2 = limit(eX + eV * t * Math.sin(eHd), ROBOT_DIMENSION / 2, getBattleFieldWidth() - ROBOT_DIMENSION / 2);
+                final double eY2 = limit(eY + eV * t * Math.cos(eHd), ROBOT_DIMENSION / 2, getBattleFieldHeight() - ROBOT_DIMENSION / 2);
+                turnGunRightRadians(Utils.normalRelativeAngle(Math.atan2(eX2 - rX, eY2 - rY) - getGunHeadingRadians()));
+                setFire(firePower);
+            }
         }
     }
 
-    public RoboGravPoint findClosestGravPoint() {
+    public void predictiveShoot(RoboGravPoint p, double firePower) {
+        final double ROBOT_DIMENSION = 16;
+        if (p != null) {
+            final double eX = p.x, eY = p.y, eV = p.velocity, eHd = p.heading;
+            final double eAbsBearing = Utils.normalAbsoluteAngle(Math.atan2(eX - getX(), eY - getY()));
+            final double rX = getX(), rY = getY(), bV = Rules.getBulletSpeed(firePower);
+            final double A = (eX - rX) / bV;
+            final double B = eV / bV * Math.sin(eHd);
+            final double C = (eY - rY) / bV;
+            final double D = eV / bV * Math.cos(eHd);
+            // a*(1/t)^2 + b*(1/t) + c = 0
+            final double a = A * A + C * C;
+            final double b = 2 * (A * B + C * D);
+            final double c = (B * B + D * D - 1);
+            final double disc = b * b - 4 * a * c;
+            if (disc >= 0) {
+                final double t1 = 2 * a / (-b - Math.sqrt(disc));
+                final double t2 = 2 * a / (-b + Math.sqrt(disc));
+                final double t = Math.min(t1, t2) >= 0 ? Math.min(t1, t2) : Math.max(t1, t2);
+                final double eX2 = limit(eX + eV * t * Math.sin(eHd), ROBOT_DIMENSION / 2, getBattleFieldWidth() - ROBOT_DIMENSION / 2);
+                final double eY2 = limit(eY + eV * t * Math.cos(eHd), ROBOT_DIMENSION / 2, getBattleFieldHeight() - ROBOT_DIMENSION / 2);
+                turnGunRightRadians(Utils.normalRelativeAngle(Math.atan2(eX2 - rX, eY2 - rY) - getGunHeadingRadians()));
+                setFire(firePower);
+            }
+        }
+    }
+
+    private double limit(double value, double min, double max) {
+        return Math.min(max, Math.max(min, value));
+    }
+
+    public RoboGravPoint getClosestGravPoint() {
         double closestDistance = Double.POSITIVE_INFINITY;
         RoboGravPoint closest = null;
         for (RoboGravPoint p: gravPoints) {
