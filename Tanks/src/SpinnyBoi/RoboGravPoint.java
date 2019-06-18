@@ -18,13 +18,14 @@ public class RoboGravPoint {
     public RoboGravPoint(ScannedRobotEvent event, AdvancedRobot robot) {
         // this needs to be fixed - abstraction
         // also i want to rename RoboGravPoint...maybe
-        double distance = event.getDistance();
         double enemyAngle = robot.getHeadingRadians() + event.getBearingRadians();
-        double x = Math.sin(enemyAngle) * distance + robot.getX();
-        double y = Math.cos(enemyAngle) * distance + robot.getY();
-        double power = event.getEnergy() * 50;
-        double velocity = event.getVelocity();
-        double heading = event.getHeadingRadians();
+        this.name = event.getName();
+        this.distance = event.getDistance();
+        this.x = Math.sin(enemyAngle) * distance + robot.getX();
+        this.y = Math.cos(enemyAngle) * distance + robot.getY();
+        this.power = event.getEnergy() * 50;
+        this.velocity = event.getVelocity();
+        this.heading = event.getHeadingRadians();
     }
 
     @Override

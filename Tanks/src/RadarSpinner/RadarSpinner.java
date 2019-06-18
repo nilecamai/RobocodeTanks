@@ -17,7 +17,7 @@ public class RadarSpinner extends AdvancedRobot {
     public static final double FIRING_DISTANCE = 500;
     public static final double WALL_AVOIDANCE_CONSTANT = 250000;
     public static final double CHANCE_OF_RANDOM_MOVE = 0;
-    public static final double BOT_AVOIDANCE_CONSTANT = 500;
+    public static final double BOT_AVOIDANCE_CONSTANT = 500 * 50;
     public static final double FIREPOWER = 1;
     public ArrayList<RoboGravPoint> gravPoints = new ArrayList<RoboGravPoint>();
 
@@ -37,8 +37,8 @@ public class RadarSpinner extends AdvancedRobot {
             }
             //antiGravMove();
             execute();
-            shootAtClosest();
-            //predictiveShoot(getClosestGravPoint());
+            //shootAtClosest();
+            predictiveShoot(getClosestGravPoint());
             execute();
             //avoidWalls();
             //execute();
@@ -67,7 +67,7 @@ public class RadarSpinner extends AdvancedRobot {
         double enemyAngle = getHeadingRadians() + event.getBearingRadians();
         double x = Math.sin(enemyAngle) * distance + getX();
         double y = Math.cos(enemyAngle) * distance + getY();
-        double power = event.getEnergy() * 50;
+        double power = event.getEnergy();
         double velocity = event.getVelocity();
         double heading = event.getHeadingRadians();
 

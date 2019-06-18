@@ -2,7 +2,9 @@ package SpinnyBoi;
 import robocode.*;
 
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.HashMap;
+import java.util.Iterator;
 import robocode.util.*;
 /*
  * you want to have the radar spinning independent of the gun so you can actively be scanning while moving/shooting
@@ -12,7 +14,7 @@ import robocode.util.*;
  *      the radar
  */
 
-public class SpinnyBoi extends AdvancedRobot {
+public class HashMapTest extends AdvancedRobot {
 
     public static final double CLOSE_QUARTERS_DISTANCE = 10;
     public static final double FIRING_DISTANCE = 500;
@@ -20,7 +22,8 @@ public class SpinnyBoi extends AdvancedRobot {
     public static final double CHANCE_OF_RANDOM_MOVE = 0.0/8.0;
     public static final double BOT_AVOIDANCE_CONSTANT = 25000; // used to be 500 but we had magic number 50 hanging out to determine power so.
     public static final double FIREPOWER = 1;
-    public ArrayList<EnemyBot> enemyBots = new ArrayList<EnemyBot>();
+    //public ArrayList<EnemyBot> enemyBots = new ArrayList<EnemyBot>();
+    public Map<String, EnemyBot> enemyBots = new HashMap<String, EnemyBot>();
 
     public void run() {
 
@@ -66,11 +69,7 @@ public class SpinnyBoi extends AdvancedRobot {
 
     @Override
     public void onRobotDeath(RobotDeathEvent event) {
-        for (int i = 0; i < enemyBots.size(); i++) {
-            if (event.getName().equals(enemyBots.get(i).name)) {
-                enemyBots.remove(i);
-            }
-        }
+        enemyBots.remove(event.getName());
     }
 
     
@@ -86,6 +85,9 @@ public class SpinnyBoi extends AdvancedRobot {
         double heading = event.getHeadingRadians();
         
         boolean foundDuplicate = false;
+
+        enemyBots.put(name, new EnemyBot(name, x, y, power, distance, velocity, heading));
+        /*
         for (int i = 0; i < enemyBots.size(); i++) { // make sure we don't have a duplicate gravPoint/can update a gravPoint
             if (name.equals(enemyBots.get(i).name)) {
                 enemyBots.set(i, new EnemyBot(name, x, y, power, distance, velocity, heading));
@@ -99,6 +101,7 @@ public class SpinnyBoi extends AdvancedRobot {
             System.out.println("Added robot " + name);
             //enemyBots.add(new RoboGravPoint(event, this)); <- THIS HAS TO WORK TO MAKE EVERTHING EZZZ
         }
+        */
     }
 
     /*
@@ -122,11 +125,13 @@ public class SpinnyBoi extends AdvancedRobot {
 
     public void fastAntiGravMove() {
         double xForce = 0, yForce = 0;
-        for (EnemyBot e: enemyBots) {
-            double absBearing = Utils.normalAbsoluteAngle(Math.atan2(getX() - e.x, getY() - e.y));
-            xForce += Math.sin(absBearing) / Math.pow(e.distance, 2);
-            yForce += Math.cos(absBearing) / Math.pow(e.distance, 2);
+
+        for (Map.Entry<String, EnemyBot> entry : enemyBots.entrySet()) {
+            double absBearing = Utils.normalAbsoluteAngle(Math.atan2(getX() - entry.getValue().x, getY() - entry.getValue().y));
+            xForce += Math.sin(absBearing) / Math.pow(entry.getValue().distance, 2);
+            yForce += Math.cos(absBearing) / Math.pow(entry.getValue().distance, 2);
         }
+            
         // wall repulsion
         
         xForce += (WALL_AVOIDANCE_CONSTANT / getBattleFieldWidth()) / Math.pow(getX(), 2);
@@ -143,18 +148,18 @@ public class SpinnyBoi extends AdvancedRobot {
         double yForce = 0;
         double magn;
         double dir;
-        for (EnemyBot e: enemyBots) {
+        for (Map.Entry<String, EnemyBot> entry : enemyBots.entrySet()) {
             double dx, dy;
-            dx = getX() - e.x;
-            dy = getY() - e.y;
-            magn = e.energy * BOT_AVOIDANCE_CONSTANT / Math.pow(e.distance, 2); // always positive
+            dx = getX() - entry.getValue().x;
+            dy = getY() - entry.getValue().y;
+            magn = entry.getValue().energy * BOT_AVOIDANCE_CONSTANT / Math.pow(entry.getValue().distance, 2); // always positive
             dir = Math.atan2(dx, dy);
             xForce += Math.sin(dir) * magn;
             yForce += Math.cos(dir) * magn;
         }
         double xWallForce, yWallForce;
         xWallForce = WALL_AVOIDANCE_CONSTANT / Math.pow(getX(), 2) - WALL_AVOIDANCE_CONSTANT / Math.pow(getBattleFieldWidth() - getX(), 2);
-        yWallForce = WALL_AVOIDANCE_CONSTANT / Math.pow(getY(), 2) - WALL_AVOIDANCE_CONSTANT / Math.pow(getBattleFieldHeight() - getY(), 2);
+        yWallForce = yForce += WALL_AVOIDANCE_CONSTANT / Math.pow(getY(), 2) - WALL_AVOIDANCE_CONSTANT / Math.pow(getBattleFieldHeight() - getY(), 2);
         xForce += getX() + xWallForce;
         yForce += getY() + yWallForce;
         //System.out.println("Going to (" + xComp + ", " + yComp);
@@ -269,10 +274,10 @@ public class SpinnyBoi extends AdvancedRobot {
     public EnemyBot getClosestEnemyBot() {
         double closestDistance = Double.POSITIVE_INFINITY;
         EnemyBot closest = null;
-        for (EnemyBot e: enemyBots) {
-            if (e.distance < closestDistance) {
-                closest = e;
-                closestDistance = e.distance;
+        for (Map.Entry<String, EnemyBot> entry : enemyBots.entrySet()) {
+            if (entry.getValue().distance < closestDistance) {
+                closest = entry.getValue();
+                closestDistance = entry.getValue().distance;
             }
         }
         return closest;
