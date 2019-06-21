@@ -17,7 +17,7 @@ public class RadarSpinner extends AdvancedRobot {
     public static final double FIRING_DISTANCE = 500;
     public static final double WALL_AVOIDANCE_CONSTANT = 250000;
     public static final double CHANCE_OF_RANDOM_MOVE = 0;
-    public static final double BOT_AVOIDANCE_CONSTANT = 500 * 50;
+    public static final double BOT_AVOIDANCE_CONSTANT = 12500;
     public static final double FIREPOWER = 1;
     public ArrayList<RoboGravPoint> gravPoints = new ArrayList<RoboGravPoint>();
 
